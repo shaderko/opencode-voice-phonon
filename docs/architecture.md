@@ -195,6 +195,12 @@ plugin vendors the MIT C engine verbatim and wraps it in a small, audited FFI
 layer. The trade-off is a C toolchain at build time and `unsafe` FFI at the
 boundary; the upside is numerical fidelity and a much smaller scope.
 
+The C engine is CPU-only. Fermion's GPU paths are MLX on Apple silicon and CUDA
+through its Python/torch engine or CUDA container; neither is a drop-in for the
+Rust/C sidecar. A GPU backend would need a separate Python/CUDA runtime or an
+ONNX/ONNX Runtime port, both larger than the “no additional installs” target.
+0.1.0 uses four CPU workers by default (`P25_THREADS` overrides).
+
 **Download instead of bundling weights.** Bundling 183 MB (255 MB unpacked)
 would inflate every install, including for users who never record. Downloading
 once with a pinned checksum keeps the package small. The cost is a slow first

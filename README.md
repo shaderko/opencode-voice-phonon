@@ -9,8 +9,8 @@ Local, offline voice prompts for [OpenCode](https://opencode.ai), powered by
 - **TUI:** a microphone in the prompt footer. Press `Ctrl+Space`, click it, or
   run `/voice`; review and submit, or send immediately.
 - **Local:** a Rust sidecar with vendored Phonon-2.5 C inference. No Python, no
-  model server, no GPU. The 183 MB model is downloaded once and checked against
-  a pinned SHA-256.
+  model server. The 183 MB model is downloaded once and checked against a
+  pinned SHA-256. Inference is CPU-only in 0.1.0; GPU backends are future work.
 
 ## Install
 

@@ -86,6 +86,9 @@ export class VoiceBackend {
     if (this.options.modelDir) {
       env.OPENCODE_VOICE_MODEL_DIR = this.options.modelDir
     }
+    // Four workers are enough for real-time dictation and keep decode spikes
+    // off every core. P25_THREADS overrides it for slower/faster machines.
+    env.P25_THREADS ??= "4"
 
     this.stderrRing = []
     this.exitEmitted = false

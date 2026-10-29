@@ -267,12 +267,14 @@ recording during either phase is intentionally rejected.
 ## High CPU during transcription
 
 **Cause:** Phonon-2.5 decodes on the CPU with the engine's thread pool. Long
-recordings and the final window are the expensive parts.
+recordings and the final window are the expensive parts. The sidecar uses four
+worker threads by default.
 
-**Fix:** this is expected. Stop the recording when you are done; do not leave a
-session listening in the background. The reference measurement used 4 threads
-and processed a 10.97 s clip in 0.87 s. If the machine is thermally limited,
-reduce recording length. There is no thread-count option in 0.1.0.
+**Fix:** Stop the recording when you are done; do not leave a session listening
+in the background. To reduce peak CPU further, set `P25_THREADS=2` in the
+environment before launching OpenCode; transcription becomes slower. To use
+more cores on a fast desktop, set `P25_THREADS=8`. There is no GPU backend in
+0.1.0: the bundled C engine is CPU-only.
 
 ## Linux: ALSA library missing
 

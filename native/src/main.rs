@@ -19,6 +19,8 @@ use voice_core::protocol::{self, CoreState, Event, ModelState};
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const PARTIAL_INTERVAL: Duration = Duration::from_millis(700);
 const PARTIAL_MAX_PENDING_SECONDS: f64 = 10.0;
+const PARTIAL_SPEECH_WINDOW: Duration = Duration::from_millis(2000);
+const PARTIAL_SPEECH_RMS: f32 = 0.006;
 const AUDIO_QUEUE: usize = 2048;
 const TRANSCRIBE_CHUNK: usize = 1600;
 const ENV_MODEL_DIR: &str = "OPENCODE_VOICE_MODEL_DIR";
@@ -252,6 +254,7 @@ struct Session {
     phase: Phase,
     done_handled: bool,
     last_partial_at: Instant,
+    last_speech_at: Option<Instant>,
 }
 
 impl Session {
@@ -272,6 +275,7 @@ impl Session {
             phase: Phase::Idle,
             done_handled: false,
             last_partial_at: Instant::now(),
+            last_speech_at: None,
         }
     }
 
@@ -365,6 +369,7 @@ impl Session {
                 self.partial = None;
                 self.done_handled = false;
                 self.last_partial_at = Instant::now();
+                self.last_speech_at = None;
                 self.phase = Phase::Listening;
                 self.emit_state(CoreState::Listening);
             }
@@ -423,6 +428,7 @@ impl Session {
         self.finals.clear();
         self.partial = None;
         self.done_handled = false;
+        self.last_speech_at = None;
         self.phase = Phase::Idle;
         self.discard_audio();
         self.emit_state(CoreState::Idle);
@@ -448,6 +454,16 @@ impl Session {
             None => return,
         };
         if pending > PARTIAL_MAX_PENDING_SECONDS {
+            return;
+        }
+
+        // Silence is not worth a full decode. Wait until there has been
+        // speech in the last two seconds; the final window still runs on stop.
+        let speaking = self
+            .last_speech_at
+            .map(|at| at.elapsed() <= PARTIAL_SPEECH_WINDOW)
+            .unwrap_or(false);
+        if !speaking {
             return;
         }
 
@@ -481,6 +497,17 @@ impl Session {
                 Some(stream) => stream.feed(&chunk.samples),
                 None => continue,
             };
+            if !chunk.samples.is_empty() {
+                let mean_square = chunk
+                    .samples
+                    .iter()
+                    .map(|sample| f64::from(*sample) * f64::from(*sample))
+                    .sum::<f64>()
+                    / chunk.samples.len() as f64;
+                if mean_square.sqrt() >= f64::from(PARTIAL_SPEECH_RMS) {
+                    self.last_speech_at = Some(Instant::now());
+                }
+            }
             if let Err(err) = fed {
                 return Some(err);
             }
@@ -522,6 +549,7 @@ impl Session {
         self.finals.clear();
         self.partial = None;
         self.done_handled = false;
+        self.last_speech_at = None;
         self.phase = Phase::Idle;
         self.discard_audio();
         self.emit_state(CoreState::Idle);
