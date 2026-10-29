@@ -1,0 +1,42 @@
+opencode-voice-phonon
+==============
+
+This package contains the opencode-voice-phonon plugin code (MIT) and vendors the
+following third-party components.
+
+1. phonon-2.5-c inference engine
+--------------------------------
+Source: https://github.com/eschmidbauer/phonon-2.5-c
+License: MIT (see native/vendor/phonon25/LICENSE)
+
+Copyright (c) 2026 the phonon-2.5-c authors.
+
+The Windows compatibility layer under native/vendor/phonon25/win32 is part of
+opencode-voice-phonon and is licensed MIT with the rest of this package.
+
+2. Phonon-2.5 model weights
+---------------------------
+Source: https://huggingface.co/FermionResearch/Phonon-2.5
+Repacked for the C engine by eschmidbauer:
+https://huggingface.co/eschmidbauer/phonon-2.5-c
+License: Creative Commons Attribution 4.0 International (CC-BY-4.0)
+
+Phonon-2.5 is by Fermion Research, derived from NVIDIA's
+parakeet-tdt-0.6b-v3. The weights are downloaded by the user at first run and
+are not included in this package. The full attribution and list of changes are
+in the NOTICE file of the weights repository:
+https://huggingface.co/FermionResearch/Phonon-2.5/blob/main/NOTICE
+
+3. NVIDIA parakeet-tdt-0.6b-v3
+------------------------------
+Source: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+License: CC-BY-4.0
+
+The Phonon-2.5 weights are a derivative of this model. See the Phonon-2.5
+NOTICE for the complete training-data and attribution terms.
+
+4. OpenCode plugin SDK and OpenTUI
+----------------------------------
+@opencode/plugin, @opencode/client, @opentui/core, @opentui/solid and
+solid-js are used under their respective licenses. They are dependencies, not
+vendored source.

@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "Run the end-to-end test (downloads the 183 MB model)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  typescript:
+    name: typescript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:gui
+      - run: npm run typecheck
+      - run: npm test
+
+  rust:
+    name: rust (${{ matrix.key }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: win32-x64
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            binary: native/target/x86_64-pc-windows-msvc/release/voice-core.exe
+          - key: darwin-arm64
+            os: macos-14
+            rust_target: aarch64-apple-darwin
+            binary: native/target/aarch64-apple-darwin/release/voice-core
+          - key: darwin-x64
+            os: macos-13
+            rust_target: x86_64-apple-darwin
+            binary: native/target/x86_64-apple-darwin/release/voice-core
+          - key: linux-x64
+            os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            binary: native/target/x86_64-unknown-linux-gnu/release/voice-core
+          - key: linux-arm64
+            os: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+            binary: native/target/aarch64-unknown-linux-gnu/release/voice-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - name: Install ALSA headers
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+      - name: Check formatting
+        run: cargo fmt --check --manifest-path native/Cargo.toml
+      - name: Test
+        run: cargo test --manifest-path native/Cargo.toml --target ${{ matrix.rust_target }}
+      - name: Build release
+        run: cargo build --release --manifest-path native/Cargo.toml --target ${{ matrix.rust_target }}
+      - name: Package native binary
+        run: node scripts/package-native.mjs --target ${{ matrix.key }} --source ${{ matrix.binary }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-core-${{ matrix.key }}
+          path: bin
+          if-no-files-found: error
+
+  e2e:
+    name: e2e
+    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install ALSA headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+      - name: Download model weights
+        env:
+          MODEL_URL: https://huggingface.co/eschmidbauer/phonon-2.5-c/resolve/main/phonon-2.5-c-weights-v1.tar.gz
+          MODEL_SHA256: ed622ca97bc4ec044c7ba5fb69c10985b1b3897e600dbf611840d9a0692b4cfe
+        run: |
+          mkdir -p "$RUNNER_TEMP/model"
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/phonon-2.5-c-weights-v1.tar.gz" "$MODEL_URL"
+          echo "$MODEL_SHA256  $RUNNER_TEMP/phonon-2.5-c-weights-v1.tar.gz" | sha256sum --check -
+      - name: Extract model weights
+        run: tar -xzf "$RUNNER_TEMP/phonon-2.5-c-weights-v1.tar.gz" -C "$RUNNER_TEMP/model"
+      - name: Build release
+        run: cargo build --release --manifest-path native/Cargo.toml
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Run e2e
+        run: node scripts/e2e.mjs --wav tests/data/4077-13754-0014.wav --model-dir "$RUNNER_TEMP/model/c_weights"

@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (${{ matrix.key }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: win32-x64
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            binary: native/target/x86_64-pc-windows-msvc/release/voice-core.exe
+          - key: darwin-arm64
+            os: macos-14
+            rust_target: aarch64-apple-darwin
+            binary: native/target/aarch64-apple-darwin/release/voice-core
+          - key: darwin-x64
+            os: macos-13
+            rust_target: x86_64-apple-darwin
+            binary: native/target/x86_64-apple-darwin/release/voice-core
+          - key: linux-x64
+            os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            binary: native/target/x86_64-unknown-linux-gnu/release/voice-core
+          - key: linux-arm64
+            os: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-gnu
+            binary: native/target/aarch64-unknown-linux-gnu/release/voice-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - name: Install ALSA headers
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+      - name: Build release
+        run: cargo build --release --manifest-path native/Cargo.toml --target ${{ matrix.rust_target }}
+      - name: Package native binary
+        run: node scripts/package-native.mjs --target ${{ matrix.key }} --source ${{ matrix.binary }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-core-${{ matrix.key }}
+          path: bin
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          path: bin
+          merge-multiple: true
+      - run: npm ci
+      - name: Build Desktop GUI bundle
+        run: npm run build:gui
+      - name: Verify all native binaries are present
+        run: node scripts/check-binaries.mjs --require-all
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

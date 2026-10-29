@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# Rust
+native/target/
+native/vendor/phonon25/csrc/*.o
+native/vendor/phonon25/csrc/*.a
+native/vendor/phonon25/csrc/phonon25
+native/vendor/phonon25/csrc/*.dylib
+native/vendor/phonon25/csrc/*.so
+native/vendor/phonon25/csrc/*.exe
+
+# Downloaded model / weights (never commit)
+models/
+*.tar.gz
+c_weights/
+
+# Swarm scratch (never commit)
+.opencode/swarm/
+
+# Local binaries built by scripts
+bin/*
+!bin/.gitkeep

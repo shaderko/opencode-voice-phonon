@@ -1,0 +1,5 @@
+# Static CRT on Windows: the packaged voice-core.exe must not require the
+# Visual C++ redistributable on a clean machine. native/build.rs mirrors this
+# with cc::Build::static_crt(true); keep the two in step.
+[target.'cfg(windows)']
+rustflags = ["-C", "target-feature=+crt-static"]
